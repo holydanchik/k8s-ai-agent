@@ -2,16 +2,16 @@
 AI-driven incident response automation for microservices — AI agent + n8n + Kubernetes (PoC).
 
 ## Overview
-PoC shows workflow:
-`Falco -> webhook -> n8n -> AI Agent (OpenAI) -> decision -> n8n -> Kubernetes API (action) + SIEM/log`.
+Workflow:  
+`Falco -> webhook -> n8n -> AI Agent (OpenAI) -> decision -> n8n -> Kubernetes API (action) + SIEM/log`
 
-Intended audience: students, SOC engineers, SMBs wanting low-cost SOAR capabilities.
+Audience: students, SOC engineers, SMBs wanting low-cost SOAR capabilities.
 
 ## Features
 - Event ingestion (Falco / kube-audit / Prometheus)  
 - AI-based decision making (OpenAI API)  
 - Orchestration via n8n (playbooks)  
-- Actions: annotate/quarantine/delete pod, alert to SIEM, escalate to human  
+- Actions: annotate / quarantine / delete pod, alert to SIEM, escalate to human  
 - Metrics: MTTA, MTTR, False Positive Rate (FPR)
 
 ---
@@ -19,11 +19,13 @@ Intended audience: students, SOC engineers, SMBs wanting low-cost SOAR capabilit
 ## Quickstart (Kind / local PoC)
 
 ### Prerequisites
-- Docker (>=20) and `kubectl`
-- `kind` or `minikube` (recommended kind)
+- Docker (>= 20) and `kubectl`
+- `kind` or `minikube` (recommended: `kind`)
 - `helm`
 - Git
 - `OPENAI_API_KEY` (set as env var; **do not commit to repo**)
+
+---
 
 ### 1) Create kind cluster
 ```bash
@@ -32,77 +34,130 @@ kubectl cluster-info --context kind-ai-agent-poc
 ```
 
 ### 2) Install Prometheus/Grafana & Loki (optional)
+Use official Helm charts for Prometheus / Grafana / Loki if you want metrics/logs and dashboards.
+This step is optional for the minimal PoC.
 
-Use helm charts or minimal manifests — optional for PoC.
-
-### 3) Install Falco (example via helm)
-```bash
+### 3) Install Falco (via Helm)
+``` bash
 helm repo add falcosecurity https://falcosecurity.github.io/charts
 helm repo update
 helm install falco falcosecurity/falco --namespace falco --create-namespace
 ```
 
 ### 4) Deploy n8n
+Option A — Helm in cluster:
 ```bash
 kubectl create ns automation
 helm repo add n8n https://n8n-io.github.io/n8n-helm/
+helm repo update
 helm install n8n n8n/n8n --namespace automation
-# alternatively run n8n locally with Docker-compose for development
 ```
+Option B — run n8n locally (docker-compose):
+Recommended for faster development. Then use local webhook instead of cluster ingress.
 
-### 5) Build & push AI-Agent image (locally)
+### 5) Build AI-Agent image (locally)
 ```bash
 # from repo root
 docker build -t k8s-ai-agent:latest ./agent
-# for GHCR push or local use: docker tag/push as needed
+
+# for kind
+kind load docker-image k8s-ai-agent:latest --name ai-agent-poc
 ```
 
-### 6) Deploy AI-Agent (example deployment)
-
+### 6) Deploy AI-Agent
+Create namespace:
+```bash
+kubectl create ns automation
+```
+Create secret with your OpenAI key:
+```bash
+kubectl create secret generic openai-secret \
+  --from-literal=api-key="$OPENAI_API_KEY" \
+  -n automation
+```
+Apply deployment manifest:
+```bash
 kubectl apply -f deployment/agent-deployment.yaml
+kubectl -n automation get pods
+```
+Ensure agent-deployment.yaml references the correct image (local or GHCR).
 
-Agent expects OPENAI_API_KEY in k8s secret or env (see SECURITY note).
-
-### 7) Configure Falco -> n8n webhook
-
-In n8n create a webhook node to accept Falco events.
-
-Falco: set output to HTTP (webhook) to send events to n8n endpoint.
+### 7) Configure Falco → n8n webhook
+- In n8n create a Webhook node and copy endpoint.
+- Configure Falco to send output to this webhook.
+- For local dev:
+```bash
+kubectl -n automation port-forward svc/n8n 5678:5678
+```
+Then set Falco webhook → http://localhost:5678/webhook/...
 
 ### 8) Create n8n workflow
-
-Workflow outline:
-
-Webhook trigger (Falco event)
-
-Enrich (fetch pod metadata, Prometheus metrics)
-
-HTTP Request to AI-Agent (send structured event)
-
-Switch on AI-Agent decision:
-
-If action == quarantine => patch NetworkPolicy via Kubernetes node
-
-If action == delete => call Kubernetes API (delete pod)
-
-Always send alert to SIEM/logstore
-
-If escalate => create high-priority ticket / notify human
-
-Log action + store audit record
+1. Webhook trigger (Falco event)
+2. Enrich: fetch pod metadata / Prometheus metrics
+3. HTTP → AI-Agent (/analyze)
+4. Switch on decision:
+    - quarantine → patch NetworkPolicy / annotate pod
+    - delete → kubectl delete pod
+    - alert → forward to SIEM/logstore
+    - escalate → Slack/email → human
+5. Log action + store audit record
 
 ### 9) Simulate safe attacks
-
-Use included examples/ YAMLs (cpu-hog, exfil-sim, nmap scan) — safe patterns only.
+Use manifests from examples/:
+```bash
+kubectl apply -f examples/cpu-hog.yaml
+kubectl apply -f examples/exfil-sim.yaml
+kubectl apply -f examples/portscan-job.yaml
+```
+These are safe — only simulate resource hog / scan patterns.
 
 ### 10) Metrics and evaluation
+- Measure MTTA, MTTR, FPR by comparing detected vs expected.
+- Store logs/CSV for evaluation.
 
-Collect MTTA/MTTR/FPR by running multiple test runs and comparing detected events vs expected.
+## Security
+- Never commit secrets (OPENAI_API_KEY, kubeconfigs).
+- Use Kubernetes Secrets / CI secrets.
+- Consider Vault / sealed-secrets.
+- Add SECURITY.md with disclosure process.
 
-## Security / Secrets
+## Repo structure
+```text
+k8s-ai-agent/
+├─ .github/                 # CI/CD workflows (GitHub Actions)
+│  └─ workflows/ci.yml
+├─ agent/                   # AI agent code
+│  ├─ Dockerfile
+│  ├─ app.py
+│  ├─ requirements.txt
+│  └─ deployment.yaml
+├─ n8n/                     # Exported n8n workflows
+│  └─ workflows.json
+├─ deployment/              # Kubernetes manifests
+│  ├─ agent-deployment.yaml
+│  ├─ n8n-deployment.yaml
+│  └─ falco-values.yaml
+├─ examples/                # Test workloads (safe attack simulations)
+│  ├─ cpu-hog.yaml
+│  ├─ exfil-sim.yaml
+│  └─ portscan-job.yaml
+├─ docs/                    # Docs and diagrams
+│  ├─ architecture.png
+│  └─ playbooks.md
+├─ README.md
+├─ LICENSE
+├─ SECURITY.md
+└─ .gitignore
+```
 
-Never commit OPENAI_API_KEY or kubeconfigs.
-
-Use Kubernetes Secrets or CI secrets to store keys.
-
-Use SECURITY.md to explain reporting process.
+## Troubleshooting
+Check pods:
+```bash
+kubectl top pods
+kubectl describe pod <name>
+```
+If Falco webhook fails → forward n8n:
+```bash
+Copy code
+kubectl -n automation port-forward svc/n8n 5678:5678
+```
