@@ -1,0 +1,21 @@
+# kind-config.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: ai-agent-poc
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # Grafana (порт 3000)
+      - containerPort: 30000
+        hostPort: 3000
+        protocol: TCP
+      # Prometheus (порт 9090)
+      - containerPort: 30090
+        hostPort: 9090
+        protocol: TCP
+      # Loki (порт 3100)
+      - containerPort: 31000
+        hostPort: 3100
+        protocol: TCP
+  - role: worker
+  - role: worker
