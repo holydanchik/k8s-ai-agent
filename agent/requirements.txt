@@ -1,7 +1,0 @@
-fastapi
-uvicorn[standard]
-requests
-prometheus_client
-openai
-kubernetes
-pydantic

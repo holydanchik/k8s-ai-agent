@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cpu-spike
+  namespace: tests
+spec:
+  containers:
+    - name: stress
+      image: progrium/stress
+      args: ["--cpu", "4", "--timeout", "30s"]
