@@ -3,9 +3,29 @@ apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
     extraPortMappings:
-      - containerPort: 30001  # n8n
+      - containerPort: 30008  # n8n
+        hostPort: 30008
+      - containerPort: 30300  # Grafana
+        hostPort: 30300
+      - containerPort: 32040  # Falcosidekick UI
+        hostPort: 32040
+      - containerPort: 30900  # Prometheus
+        hostPort: 30900
+      - containerPort: 31000  # Loki UI
+        hostPort: 31000
+      - containerPort: 30123  # Pushgateway
+        hostPort: 30123
+
+
+      - containerPort: 30001  # additional services
         hostPort: 30001
       - containerPort: 30002  # additional services
         hostPort: 30002
       - containerPort: 30003  # additional services
         hostPort: 30003
+      - containerPort: 30004  # additional services
+        hostPort: 30004
+      - containerPort: 30005  # additional services
+        hostPort: 30005
+      - containerPort: 30006  # additional services
+        hostPort: 30006
