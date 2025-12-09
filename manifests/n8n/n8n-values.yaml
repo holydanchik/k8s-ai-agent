@@ -1,0 +1,23 @@
+config:
+  database:
+    type: sqlite
+  generic:
+    timezone: "Asia/Almaty"
+  host: "0.0.0.0"
+  listen_address: "0.0.0.0"
+  port: 5678
+
+service:
+  type: NodePort
+  port: 5678
+  nodePort: 30008
+
+image:
+  repository: n8nio/n8n
+  tag: latest
+  
+scaling:
+  enabled: false
+
+redis:
+  enabled: false
