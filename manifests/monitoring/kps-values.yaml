@@ -1,0 +1,13 @@
+grafana:
+  enabled: false  
+
+prometheus:
+  service:
+    type: NodePort
+    nodePort: 30900
+
+prometheus-pushgateway:
+  enabled: true
+  service:
+    type: NodePort
+    nodePort: 30123

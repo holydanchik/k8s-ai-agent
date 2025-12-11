@@ -3,26 +3,6 @@
   "nodes": [
     {
       "parameters": {
-        "model": "deepseek-r1:8b",
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
-      "typeVersion": 1,
-      "position": [
-        80,
-        208
-      ],
-      "id": "fdc33b15-77a8-4721-afe2-7f0a6c2b8e1c",
-      "name": "Ollama Chat Model",
-      "credentials": {
-        "ollamaApi": {
-          "id": "v61uTbSGU6bcmAYE",
-          "name": "local ollama"
-        }
-      }
-    },
-    {
-      "parameters": {
         "httpMethod": "POST",
         "path": "falco",
         "options": {}
@@ -30,62 +10,42 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        0,
-        0
+        -1488,
+        224
       ],
-      "id": "5e7b9ae2-ed7a-44ee-8970-09e0765fb178",
+      "id": "0f31eff1-a00a-4dde-a152-3706d45caea9",
       "name": "FalcoWebhook",
       "webhookId": "2a4813c0-679a-4faf-8518-b53dc5d0f553"
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=You are an AI cybersecurity analyst specialized in Kubernetes runtime events from Falco.\n\nYour task:\n1. Read the Falco event JSON provided below.\n2. Apply the ROSES incident analysis framework:\n   - ROLE – who is involved? (pod, namespace, container, process)\n   - OBJECTIVE – what is happening? (describe rule + behavior)\n   - STEPS – what led to this event?\n   - EVIDENCE – list evidence extracted directly from the JSON\n   - SUMMARY – short conclusion (1–2 sentences)\n\n3. Classify the event into one of:\n   - false_positive\n   - benign_positive\n   - suspicious\n   - true_positive\n   - false_negative\n\n4. Return **STRICT JSON ONLY**, no text outside JSON.\n\nJSON format:\n{\n  \"roses\": {\n    \"role\": \"...\",\n    \"objective\": \"...\",\n    \"steps\": \"...\",\n    \"evidence\": \"...\",\n    \"summary\": \"...\"\n  },\n  \"classification\": \"false_positive | benign_positive | suspicious | true_positive | false_negative\",\n  \"confidence\": 0-1\n}\n\nFalco Event: {{ $json.toJsonString() }}",
+        "text": "=You are an AI cybersecurity analyst specialized in Kubernetes runtime events from Falco.\n\nYour task:\n1. Read the Falco event JSON provided below.\n2. Apply the ROSES incident analysis framework:\n   - ROLE – who is involved? (pod, namespace, container, process)\n   - OBJECTIVE – what is happening?\n   - STEPS – what led to this event?\n   - EVIDENCE – list direct evidence from the JSON\n   - SUMMARY – short conclusion\n\n3. Classify the event into:\n   false_positive, benign_positive, suspicious, true_positive, false_negative\n\n4. Return STRICT JSON ONLY, no text outside JSON.\n\nJSON format:\n{\n  \"roses\": {\n    \"role\": \"\",\n    \"objective\": \"\",\n    \"steps\": \"\",\n    \"evidence\": \"\",\n    \"summary\": \"\"\n  },\n  \"classification\": \"\",\n  \"confidence\": 0\n}\n\nFalco Event:\n{{ $json.toJsonString() }}",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3,
       "position": [
-        208,
-        0
+        -1280,
+        224
       ],
-      "id": "01f16d68-cec8-49da-9155-40fd2df3cc66",
+      "id": "71224620-00d5-4a55-84cf-48765e18ec6a",
       "name": "ROSES Prompt"
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=You are an AI incident response agent responsible for making decisions in Kubernetes based on Falco runtime security events.\n\nYour task:\n1. Read the Falco event JSON below (already preprocessed by a ROSES classifier).\n2. Apply the RACE decision-making framework:\n\nRECOGNIZE – summarize in 1 short sentence what the event describes  \nASSESS – is the event harmful? (evaluate using rule, process, privileges, pod name, namespace and ROSES classification)  \nCHOOSE – choose exactly ONE action:\n  - delete_pod\n  - quarantine_pod\n  - ignore\n  - escalate  \nEXPLAIN – explain briefly (1–2 sentences) why you chose this action\n\n3. Return STRICT JSON ONLY. No explanation outside JSON.\n\nJSON format (exact keys and types):\n{\n  \"decision\": \"delete_pod | quarantine_pod | ignore | escalate\",\n  \"explanation\": \"string\",\n  \"confidence\": 0.0\n}\n\nInput Event (Falcosidekick payload):\n{{ $json.toJsonString() }}\n",
+        "text": "=You are an AI incident response agent responsible for making decisions in Kubernetes based on Falco runtime security events.\n\nUse the following rules:\n\nDELETE_POD only if ALL:\n- process is a shell (sh/bash/python) OR suspicious binary (nc, wget, curl, socat)\n- AND user is root or UID 0\n- AND pod is NOT a system pod (grafana, loki, promtail, prometheus, falco, n8n, kube-system, monitoring)\n- AND event severity is Warning or higher\n\nQUARANTINE_POD only if ALL:\n- behavior is suspicious\n- AND pod is NOT a system pod\n- AND namespace is a user namespace (playground, default, staging, dev)\n\nESCALATE if ANY:\n- uncertain classification\n- insufficient data\n- ambiguous ROSES classification\n- system pod involved\n- possibly harmful but unclear\n\nIGNORE if ANY:\n- event is clearly benign\n- pod contains: test, demo, sandbox\n- behavior expected for this pod\n- harmless process (sleep, echo, nginx, pause, redis)\n\nSPECIAL TEST RULES:\nIf pod name contains \"test-delete\", decision MUST be \"delete_pod\".\nIf pod name contains \"test-quarantine\", decision MUST be \"quarantine_pod\".\nIf pod name contains \"test-escalate\", decision MUST be \"escalate\".\nIf pod name contains \"test-ignore\", decision MUST be \"ignore\".\n\nOutput rules:\nReturn STRICT JSON ONLY:\n\n{\n  \"decision\": \"\",\n  \"explanation\": \"\",\n  \"confidence\": 0.0\n}\n\n- decision ∈ {delete_pod, quarantine_pod, ignore, escalate}\n- explanation is 1–2 sentences\n- confidence is float 0–1\n- no extra fields\n- no surrounding text\n- no reasoning\n\nInput event: {{ $('FalcoWebhook').all().toJsonString() }}",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3,
       "position": [
-        560,
-        0
+        -928,
+        224
       ],
-      "id": "17fa5e6c-7f41-4ac1-a35a-a52deac67414",
+      "id": "757979f5-9a86-4315-870c-16179355d5a5",
       "name": "RACE Prompt"
-    },
-    {
-      "parameters": {
-        "model": "deepseek-r1:8b",
-        "options": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
-      "typeVersion": 1,
-      "position": [
-        512,
-        208
-      ],
-      "id": "3e433d98-f280-4e7f-9200-9e224f6954ad",
-      "name": "Ollama Chat Model1",
-      "credentials": {
-        "ollamaApi": {
-          "id": "v61uTbSGU6bcmAYE",
-          "name": "local ollama"
-        }
-      }
     },
     {
       "parameters": {
@@ -94,10 +54,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        912,
-        0
+        -576,
+        224
       ],
-      "id": "5051d276-4309-424a-a1a7-e882dc14a6ad",
+      "id": "f8d7f837-a2af-4e8e-ab8b-f4629dacb1c6",
       "name": "Parser"
     },
     {
@@ -114,7 +74,7 @@
                 },
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.decision }}",
+                    "leftValue": "={{ $('Parser').item.json.body.output_fields['decision'] }}",
                     "rightValue": "ignore",
                     "operator": {
                       "type": "string",
@@ -139,7 +99,7 @@
                 "conditions": [
                   {
                     "id": "8de4fbd0-a11d-476c-b13f-18945f5e4f59",
-                    "leftValue": "={{ $json.decision }}",
+                    "leftValue": "={{ $('Parser').item.json.body.output_fields['decision'] }}",
                     "rightValue": "quarantine_pod",
                     "operator": {
                       "type": "string",
@@ -163,7 +123,7 @@
                 "conditions": [
                   {
                     "id": "a372987b-35d6-434f-8f67-c0db355f1391",
-                    "leftValue": "={{ $json.decision }}",
+                    "leftValue": "={{ $('Parser').item.json.body.output_fields['decision'] }}",
                     "rightValue": "delete_pod",
                     "operator": {
                       "type": "string",
@@ -187,7 +147,7 @@
                 "conditions": [
                   {
                     "id": "26e129f7-f36e-43ec-87b3-67db6d985fb3",
-                    "leftValue": "={{ $json.decision }}",
+                    "leftValue": "={{ $('Parser').item.json.body.output_fields['decision'] }}",
                     "rightValue": "escalate",
                     "operator": {
                       "type": "string",
@@ -207,10 +167,10 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        1120,
-        0
+        -160,
+        224
       ],
-      "id": "ab5547c6-88dd-42b2-9c9d-0fdb78ef9e2e",
+      "id": "c806c4c0-457a-482c-b5dc-75841c36d954",
       "name": "Switch"
     },
     {
@@ -222,16 +182,16 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1488,
-        -224
+        208,
+        0
       ],
-      "id": "054cd1dd-bb96-4c1b-85bc-16559617dbe2",
+      "id": "d5cc328b-8188-4816-a8f6-8ae0cb81b572",
       "name": "Ignore message",
       "webhookId": "804fb53b-b96e-475c-82c8-5d07483398c3",
       "credentials": {
         "telegramApi": {
-          "id": "buyfRI5rEGylNFMb",
-          "name": "k8s_ai_agent_bot"
+          "id": "tmdlzcHiU9V2iORk",
+          "name": "Telegram account"
         }
       }
     },
@@ -244,16 +204,16 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1504,
-        400
+        224,
+        624
       ],
-      "id": "50cd6302-05c3-48a4-add8-4a75f7b4fa5d",
+      "id": "e0c5259d-b749-4798-ab82-83dbad217316",
       "name": "Escalate",
       "webhookId": "49d6f28f-6487-43dc-a8bb-2b935b7e784f",
       "credentials": {
         "telegramApi": {
-          "id": "buyfRI5rEGylNFMb",
-          "name": "k8s_ai_agent_bot"
+          "id": "tmdlzcHiU9V2iORk",
+          "name": "Telegram account"
         }
       }
     },
@@ -279,15 +239,15 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1504,
-        192
+        224,
+        416
       ],
-      "id": "ff5679fa-dbbc-45ba-9c23-bf3ca2c6a0b6",
+      "id": "d36e76fb-0829-4955-a27b-ab7eed0c865e",
       "name": "Delete pod",
       "credentials": {
         "httpBearerAuth": {
-          "id": "e6UiTVNP54ngsnZR",
-          "name": "n8n sa"
+          "id": "JrCbfLYt2R1mvCwh",
+          "name": "Bearer Auth account"
         }
       }
     },
@@ -316,32 +276,94 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1504,
-        0
+        224,
+        224
       ],
-      "id": "bcf31a9e-8cc4-46bf-b098-b6a59b2da95a",
+      "id": "acf0aa3f-2267-4e08-a1f1-f5d1d598434e",
       "name": "Quarantine pod",
       "credentials": {
         "httpBearerAuth": {
-          "id": "e6UiTVNP54ngsnZR",
-          "name": "n8n sa"
+          "id": "JrCbfLYt2R1mvCwh",
+          "name": "Bearer Auth account"
         }
       }
+    },
+    {
+      "parameters": {
+        "model": "deepseek-r1:8b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -976,
+        432
+      ],
+      "id": "4ff88e92-2a1d-432b-ad52-3649cffbbe20",
+      "name": "deepseek-r1:8b",
+      "credentials": {
+        "ollamaApi": {
+          "id": "lz8ZVsMNNWbM3Joe",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "deepseek-r1:8b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        432
+      ],
+      "id": "018e8c9a-eeb9-48af-959d-6ed568a20fbc",
+      "name": "deepseek--r1:8b",
+      "credentials": {
+        "ollamaApi": {
+          "id": "lz8ZVsMNNWbM3Joe",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "=return {\n  streams: [\n    {\n      stream: {\n        job: \"incident-pipeline\",\n        decision: {{ $json.decision }},\n        classification: {{ $json.classification }},\n        pod: {{ $json.pod }},\n        namespace: {{ $json.namespace }},\n      },\n      values: [\n        [\n          (Date.now() * 1_000_000).toString(),\n          JSON.stringify($json),\n        ],\n      ],\n    },\n  ],\n};\n",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -368,
+        240
+      ],
+      "id": "d023e485-2eac-4a98-aea8-aaee96c0585e",
+      "name": "Loki"
     }
   ],
   "pinData": {},
   "connections": {
-    "Ollama Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "ROSES Prompt",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "FalcoWebhook": {
       "main": [
         [
@@ -364,17 +386,6 @@
         ]
       ]
     },
-    "Ollama Chat Model1": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "RACE Prompt",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "RACE Prompt": {
       "main": [
         [
@@ -390,7 +401,7 @@
       "main": [
         [
           {
-            "node": "Switch",
+            "node": "Loki",
             "type": "main",
             "index": 0
           }
@@ -428,17 +439,60 @@
           }
         ]
       ]
+    },
+    "deepseek-r1:8b": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "RACE Prompt",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "deepseek--r1:8b": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "ROSES Prompt",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quarantine pod": {
+      "main": [
+        []
+      ]
+    },
+    "Loki": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ignore message": {
+      "main": [
+        []
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "3cf8a20d-b4cd-4e10-8cb1-8c584237a8b7",
+  "versionId": "3cab3066-5964-46c6-b7dd-50fe1c143fc8",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "f2e6a86a65b4171f7d18dec74da6fe6eb111a34c38de90c4ecb31c69a66f6313"
+    "instanceId": "8312a318481074cb0c301618cf2d247c896273b897ca9d04a3339d3894e53919"
   },
-  "id": "31GppPmEV3cRrCrc",
+  "id": "bITQJoD5QsmnFWaJ",
   "tags": []
 }
