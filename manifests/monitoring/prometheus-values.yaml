@@ -1,0 +1,10 @@
+service:
+  type: NodePort
+  nodePort: 30900
+  servicePort: 9090
+
+server:
+  enabled: true
+  service:
+    type: NodePort
+    nodePort: 30900
