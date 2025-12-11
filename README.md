@@ -7,7 +7,7 @@ It detects threats using **Falco**, analyzes events using **LLM-based ROSES & RA
 ---
 
 # 📌 Architecture Overview
-
+```pgsql
 Falco → Falcosidekick → n8n Webhook
 ↓
 ┌────────────────────────────────────────────┐
@@ -20,7 +20,7 @@ Falco → Falcosidekick → n8n Webhook
 └────────────────────────────────────────────┘
 ↓
 Grafana Dashboards
-
+```pgsql
 
 ---
 
@@ -113,12 +113,12 @@ incident_pipeline_events_total 1
 ## 8. Switch Node → Kubernetes API
 
 Decision logic:
-
+```pgsql
 delete_pod → kubectl delete pod
 quarantine_pod → patch label + apply NetworkPolicy
 escalate → external webhook / Slack
 ignore → do nothing
-
+```
 # 🧪 Test Playground Pods
 
 The script deploys:
