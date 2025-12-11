@@ -20,7 +20,7 @@ Falco → Falcosidekick → n8n Webhook
 └────────────────────────────────────────────┘
 ↓
 Grafana Dashboards
-```pgsql
+```
 
 ---
 
