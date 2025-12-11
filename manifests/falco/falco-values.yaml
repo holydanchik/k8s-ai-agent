@@ -7,10 +7,6 @@ falcosidekick:
     webhook:
       address: "http://n8n.automation.svc.cluster.local:5678/webhook/falco"
       minimumpriority: "debug"
-    
-    auth:
-      user: "admin"
-      password: "supersecret"
 
 
 falco:

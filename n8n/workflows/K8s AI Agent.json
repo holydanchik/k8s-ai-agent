@@ -10,10 +10,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -1488,
+        -2032,
         224
       ],
-      "id": "0f31eff1-a00a-4dde-a152-3706d45caea9",
+      "id": "6fe1aff5-c7f4-4a51-9065-0681c84b317a",
       "name": "FalcoWebhook",
       "webhookId": "2a4813c0-679a-4faf-8518-b53dc5d0f553"
     },
@@ -26,10 +26,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3,
       "position": [
-        -1280,
+        -1760,
         224
       ],
-      "id": "71224620-00d5-4a55-84cf-48765e18ec6a",
+      "id": "c6fd6838-0ab1-4e10-8861-f9339d1c9b92",
       "name": "ROSES Prompt"
     },
     {
@@ -41,24 +41,11 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3,
       "position": [
-        -928,
+        -1136,
         224
       ],
-      "id": "757979f5-9a86-4315-870c-16179355d5a5",
+      "id": "c9d92b0b-a6dc-44b7-bf3b-04b896650155",
       "name": "RACE Prompt"
-    },
-    {
-      "parameters": {
-        "jsCode": "const items = $input.all();\nconst rawOutput = items[0].json.output;\n\n// Находим самый первый JSON-блок\nconst jsonMatch = rawOutput.match(/\\{(?:[^{}]|(?:\\{[^{}]*\\}))*\\}/);\n\nif (!jsonMatch) {\n  throw new Error(\"❌ Could not extract JSON from RACE output\");\n}\n\nlet parsed;\ntry {\n  parsed = JSON.parse(jsonMatch[0]);\n} catch (e) {\n  throw new Error(\"❌ Failed to parse cleaned JSON: \" + e.message + \"\\nExtracted JSON: \" + jsonMatch[0]);\n}\n\nreturn [\n  {\n    json: {\n      decision: parsed.decision,\n      explanation: parsed.explanation,\n      confidence: parsed.confidence\n    }\n  }\n];\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -576,
-        224
-      ],
-      "id": "f8d7f837-a2af-4e8e-ab8b-f4629dacb1c6",
-      "name": "Parser"
     },
     {
       "parameters": {
@@ -74,7 +61,7 @@
                 },
                 "conditions": [
                   {
-                    "leftValue": "={{ $('Parser').item.json.body.output_fields['decision'] }}",
+                    "leftValue": "={{ $('Parser RACE').item.json.decision }}",
                     "rightValue": "ignore",
                     "operator": {
                       "type": "string",
@@ -99,7 +86,7 @@
                 "conditions": [
                   {
                     "id": "8de4fbd0-a11d-476c-b13f-18945f5e4f59",
-                    "leftValue": "={{ $('Parser').item.json.body.output_fields['decision'] }}",
+                    "leftValue": "={{ $('Parser RACE').item.json.decision }}",
                     "rightValue": "quarantine_pod",
                     "operator": {
                       "type": "string",
@@ -123,7 +110,7 @@
                 "conditions": [
                   {
                     "id": "a372987b-35d6-434f-8f67-c0db355f1391",
-                    "leftValue": "={{ $('Parser').item.json.body.output_fields['decision'] }}",
+                    "leftValue": "={{ $('Parser RACE').item.json.decision }}",
                     "rightValue": "delete_pod",
                     "operator": {
                       "type": "string",
@@ -147,7 +134,7 @@
                 "conditions": [
                   {
                     "id": "26e129f7-f36e-43ec-87b3-67db6d985fb3",
-                    "leftValue": "={{ $('Parser').item.json.body.output_fields['decision'] }}",
+                    "leftValue": "={{ $('Parser RACE').item.json.body.output_fields['decision'] }}",
                     "rightValue": "escalate",
                     "operator": {
                       "type": "string",
@@ -167,30 +154,30 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -160,
-        224
+        -368,
+        192
       ],
-      "id": "c806c4c0-457a-482c-b5dc-75841c36d954",
+      "id": "e5f791d0-6797-4fc2-bc87-7afbcb85daf9",
       "name": "Switch"
     },
     {
       "parameters": {
         "chatId": "-5054405605",
-        "text": "=Был проигнорирован syscall.\n\n{{ $('Parser').item.toJsonString() }}",
+        "text": "=Был проигнорирован syscall.\n\n{{ $('Parser RACE').item.toJsonString() }}",
         "additionalFields": {}
       },
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        208,
+        0,
         0
       ],
-      "id": "d5cc328b-8188-4816-a8f6-8ae0cb81b572",
+      "id": "c316b001-0609-4908-9824-f03bd95890b0",
       "name": "Ignore message",
       "webhookId": "804fb53b-b96e-475c-82c8-5d07483398c3",
       "credentials": {
         "telegramApi": {
-          "id": "tmdlzcHiU9V2iORk",
+          "id": "2EDHlV5crpkgSU2c",
           "name": "Telegram account"
         }
       }
@@ -198,21 +185,21 @@
     {
       "parameters": {
         "chatId": "-5054405605",
-        "text": "=ЭСКАЛАЦИЯ \nОТВЕТСТВЕННЫЙ: ТУЗЕЛБАЕВ ДАНИЯЛ\n\n{{ $('Parser').item.toJsonString() }}",
+        "text": "=ЭСКАЛАЦИЯ \nОТВЕТСТВЕННЫЙ: ТУЗЕЛБАЕВ ДАНИЯЛ\n\n{{ $('Parser RACE').item.toJsonString() }}",
         "additionalFields": {}
       },
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        224,
+        16,
         624
       ],
-      "id": "e0c5259d-b749-4798-ab82-83dbad217316",
+      "id": "04a3130b-824f-49dc-8ca1-2e7318b915dd",
       "name": "Escalate",
       "webhookId": "49d6f28f-6487-43dc-a8bb-2b935b7e784f",
       "credentials": {
         "telegramApi": {
-          "id": "tmdlzcHiU9V2iORk",
+          "id": "2EDHlV5crpkgSU2c",
           "name": "Telegram account"
         }
       }
@@ -239,14 +226,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        224,
+        16,
         416
       ],
-      "id": "d36e76fb-0829-4955-a27b-ab7eed0c865e",
+      "id": "737e6dde-90b7-4e0f-b77d-e4d19b33f875",
       "name": "Delete pod",
       "credentials": {
         "httpBearerAuth": {
-          "id": "JrCbfLYt2R1mvCwh",
+          "id": "OlWKGpvNQyD3RsBg",
           "name": "Bearer Auth account"
         }
       }
@@ -276,14 +263,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        224,
+        16,
         224
       ],
-      "id": "acf0aa3f-2267-4e08-a1f1-f5d1d598434e",
+      "id": "c9cc2a58-8c9e-4fe1-8548-7d579920a2c2",
       "name": "Quarantine pod",
       "credentials": {
         "httpBearerAuth": {
-          "id": "JrCbfLYt2R1mvCwh",
+          "id": "OlWKGpvNQyD3RsBg",
           "name": "Bearer Auth account"
         }
       }
@@ -296,14 +283,14 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [
-        -976,
-        432
+        -1264,
+        448
       ],
-      "id": "4ff88e92-2a1d-432b-ad52-3649cffbbe20",
+      "id": "ed7ca37c-3eac-47eb-b847-132c9abb3fde",
       "name": "deepseek-r1:8b",
       "credentials": {
         "ollamaApi": {
-          "id": "lz8ZVsMNNWbM3Joe",
+          "id": "8fNZNKVBLkrmv9dC",
           "name": "Ollama account"
         }
       }
@@ -316,14 +303,14 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [
-        -1408,
-        432
+        -1888,
+        448
       ],
-      "id": "018e8c9a-eeb9-48af-959d-6ed568a20fbc",
+      "id": "9a529958-7156-4982-bb4d-60306aa0ff55",
       "name": "deepseek--r1:8b",
       "credentials": {
         "ollamaApi": {
-          "id": "lz8ZVsMNNWbM3Joe",
+          "id": "8fNZNKVBLkrmv9dC",
           "name": "Ollama account"
         }
       }
@@ -342,7 +329,7 @@
           ]
         },
         "sendBody": true,
-        "contentType": "=return {\n  streams: [\n    {\n      stream: {\n        job: \"incident-pipeline\",\n        decision: {{ $json.decision }},\n        classification: {{ $json.classification }},\n        pod: {{ $json.pod }},\n        namespace: {{ $json.namespace }},\n      },\n      values: [\n        [\n          (Date.now() * 1_000_000).toString(),\n          JSON.stringify($json),\n        ],\n      ],\n    },\n  ],\n};\n",
+        "contentType": "=return {\n  streams: [\n    {\n      stream: {\n        job: \"incident-pipeline\",\n        decision: {{ $json.decision }},\n        classification: {{$('Parser ROSES').item.json.classification }},\n        pod: {{ $('FalcoWebhook').item.json.body.output_fields['k8s.pod.name'] }},\n        namespace: {{ $('FalcoWebhook').item.json.body.output_fields['k8s.ns.name'] }},\n      },\n      values: [\n        [\n          (Date.now() * 1_000_000).toString(),\n          JSON.stringify($json),\n        ],\n      ],\n    },\n  ],\n};\n",
         "bodyParameters": {
           "parameters": [
             {}
@@ -355,11 +342,37 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        -368,
-        240
+        -576,
+        224
       ],
-      "id": "d023e485-2eac-4a98-aea8-aaee96c0585e",
+      "id": "d083d5af-e4fa-4638-bdeb-d4b9254e9239",
       "name": "Loki"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst rawOutput = items[0].json.output;\n\n// Находим самый первый JSON-блок\nconst jsonMatch = rawOutput.match(/\\{(?:[^{}]|(?:\\{[^{}]*\\}))*\\}/);\n\nif (!jsonMatch) {\n  throw new Error(\"❌ Could not extract JSON from RACE output\");\n}\n\nlet parsed;\ntry {\n  parsed = JSON.parse(jsonMatch[0]);\n} catch (e) {\n  throw new Error(\"❌ Failed to parse cleaned JSON: \" + e.message + \"\\nExtracted JSON: \" + jsonMatch[0]);\n}\n\nreturn [\n  {\n    json: {\n      decision: parsed.decision,\n      explanation: parsed.explanation,\n      confidence: parsed.confidence\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        224
+      ],
+      "id": "862be478-04bc-4878-a4df-af1052bf49c1",
+      "name": "Parser RACE"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Получаем весь текстовый ответ ROSES\nconst items = $input.all();\nconst raw = items[0].json.output || items[0].json || \"\";\n\n// Ищем первый JSON-блок — универсальный поиск\nconst jsonMatch = raw.match(/\\{(?:[^{}]|(?:\\{[^{}]*\\}))*\\}/);\n\nif (!jsonMatch) {\n  throw new Error(\"❌ Could not extract JSON block from ROSES output\");\n}\n\nlet parsed;\ntry {\n  parsed = JSON.parse(jsonMatch[0]);\n} catch (e) {\n  throw new Error(\"❌ Failed to parse ROSES JSON: \" + e.message + \"\\nExtracted JSON:\\n\" + jsonMatch[0]);\n}\n\n// Проверяем структуру ROSES JSON\nif (!parsed.roses || !parsed.classification) {\n  throw new Error(\"❌ Parsed JSON does not contain required ROSES fields.\");\n}\n\n// Возвращаем нормализованный объект\nreturn [\n  {\n    json: {\n      role: parsed.roses.role,\n      objective: parsed.roses.objective,\n      steps: parsed.roses.steps,\n      evidence: parsed.roses.evidence,\n      summary: parsed.roses.summary,\n      classification: parsed.classification,\n      confidence: parsed.confidence\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1392,
+        224
+      ],
+      "id": "5bbea64c-c34d-48d8-b8d3-94447bbcf47a",
+      "name": "Parser ROSES"
     }
   ],
   "pinData": {},
@@ -379,7 +392,7 @@
       "main": [
         [
           {
-            "node": "RACE Prompt",
+            "node": "Parser ROSES",
             "type": "main",
             "index": 0
           }
@@ -390,18 +403,7 @@
       "main": [
         [
           {
-            "node": "Parser",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parser": {
-      "main": [
-        [
-          {
-            "node": "Loki",
+            "node": "Parser RACE",
             "type": "main",
             "index": 0
           }
@@ -462,11 +464,6 @@
         ]
       ]
     },
-    "Quarantine pod": {
-      "main": [
-        []
-      ]
-    },
     "Loki": {
       "main": [
         [
@@ -478,9 +475,26 @@
         ]
       ]
     },
-    "Ignore message": {
+    "Parser RACE": {
       "main": [
-        []
+        [
+          {
+            "node": "Loki",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser ROSES": {
+      "main": [
+        [
+          {
+            "node": "RACE Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
@@ -488,11 +502,11 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "3cab3066-5964-46c6-b7dd-50fe1c143fc8",
+  "versionId": "1f613930-4a62-4ba2-a6e0-386bbb3e9002",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "8312a318481074cb0c301618cf2d247c896273b897ca9d04a3339d3894e53919"
+    "instanceId": "516c7590e400eb1f2971b1441dbeeb0aca55521818e4b14c8b422e5af8b8e850"
   },
-  "id": "bITQJoD5QsmnFWaJ",
+  "id": "7G2VgnUA3wMcuJtZ",
   "tags": []
 }
