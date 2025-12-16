@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: escalate-case
+  namespace: playground
+  labels:
+    app: escalate-case
+spec:
+  containers:
+  - name: escalator
+    image: busybox
+    command:
+      - sh
+      - -c
+      - |
+        echo "Starting suspicious behavior...";
+        # 1 — Try reading restricted files
+        cat /etc/shadow || true;
+        # 2 — Generate CPU spike
+        while true; do :; done &
+        # 3 — Repeated file scanning (Falco flags unusual access patterns)
+        while true; do ls -la / | grep root; sleep 2; done
